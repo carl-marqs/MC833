@@ -7,7 +7,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-extern const int MAX_BUFFER_LENGTH = 4095;
+const int MAX_BUFFER_LENGTH = 4095;
 
 int Socket(int family, int type, int flags)
 {
@@ -58,5 +58,5 @@ void PrintPeerInfo(int connfd, struct sockaddr_in addr)
         exit(1);
     }
 
-    printf("[Peer Info] IP: %s | Port: %d\n", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port)); 
+    printf("[ Peer Info ] IP: %s | Port: %d\n", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port)); 
 }

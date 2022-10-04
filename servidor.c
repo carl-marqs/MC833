@@ -7,33 +7,47 @@
 #include <sys/types.h>
 #include "utils.c"
 
-// Function designed for chat between client and server.
-void loop(int connfd)
+void loop(int connfd, struct sockaddr_in connaddr)
 {
     char buffer[MAX_BUFFER_LENGTH];
+    const char *commands[4] = { "ifconfig", "pwd", "ls -l", "EXIT" };
 
-    for (;;) // loop infinito
+    for (int i = 0; i < 4; i++)
     {
-        bzero(buffer, MAX_BUFFER_LENGTH);
-   
-        // read the message from client and copy it in buffer
+        // Enviar comando
+        write(connfd, commands[i], sizeof(commands[i]));
+
+        // Critério de saída
+        if (i >= 3)
+            break;
+
+        // Ler o resultado dos comandos
+        bzero(buffer, sizeof(buffer));
         read(connfd, buffer, sizeof(buffer));
 
-        // print buffer which contains the client contents
-        printf("From client: %s\t To client : ", buffer);
-        bzero(buffer, MAX_BUFFER_LENGTH);
-        int n = 0;
-        
-        // copy server message in the buffer
-        while ((buffer[n++] = getchar()) != '\n')
-            ;
-   
-        // and send that buffer to client
-        write(connfd, buffer, sizeof(buffer));
+        // Obter nome do arquivo
+        char filename[32];
+        sprintf(filename, "%d", ntohs(connaddr.sin_port));
+        strcat(filename, " - ");
+        strcat(filename, commands[i]);
+        strcat(filename, ".txt");
+
+        // Abrir o arquivo
+        FILE *stream = fopen(filename, "w");
+        if (!stream)
+        {
+            perror("Error opening file");
+            exit(6);
+        }
+
+        // Escrever no arquivo
+        fprintf(stream, "%s", buffer);
+  
+        // Fechar o arquivo
+        fclose(stream);
     }
 }
-   
-// Driver function
+
 int main(int argc, char **argv)
 {
     // Verificar argumentos
@@ -48,37 +62,55 @@ int main(int argc, char **argv)
     struct sockaddr_in servaddr = SocketAddress(AF_INET, "127.0.0.1", atoi(argv[1]));
     struct sockaddr_in connaddr;
    
-    // 
+    // Associar conexões
     if ((bind(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr))) != 0)
     {
-        printf("socket bind failed...\n");
-        exit(0);
+        printf("Binding error\n");
+        exit(2);
     }
-    else
-        printf("Socket successfully binded..\n");
    
-    // 
+    // Entrar em modo de escuta
     if ((listen(sockfd, 10)) != 0)
     {
-        printf("Listen failed...\n");
-        exit(0);
+        printf("Error listening to clients\n");
+        exit(3);
     }
-    else
-        printf("Server listening..\n");
-    int len = sizeof(connaddr);
    
-    // 
-    int connfd = accept(sockfd, (struct sockaddr*)&connaddr, &len);
-    if (connfd < 0) {
-        printf("server accept failed...\n");
-        exit(0);
+    // Fluxo concorrente
+    socklen_t len = sizeof(connaddr); 
+    for (;;)
+    {
+        // Aceita a conexão de um cliente
+        int connfd = accept(sockfd, (struct sockaddr*)&connaddr, &len);
+        if (connfd < 0)
+        {
+            //printf("Error accepting client\n");
+            exit(4);
+        }
+
+        // Exibe informações do cliente
+        PrintPeerInfo(connfd, connaddr);
+
+        // Cria um processo filho
+        int childpid = fork();
+        if (childpid < 0)
+        {
+            printf("Error creating child process\n");
+            exit(5);
+        }
+        else if (childpid == 0)
+        {
+            // Fecha a conexão de escuta
+            close(sockfd);
+        
+            // Loop de mensagens
+            loop(connfd, connaddr);
+
+            // Fechar a conexão com o cliente
+            close(connfd);
+        }
+        
+        // Fecha a conexão
+        close(connfd);  
     }
-    else
-        printf("server accept the client...\n");
-   
-    // Loop de mensagens
-    loop(connfd);
-   
-    // Fechar o socket
-    close(sockfd);
 }

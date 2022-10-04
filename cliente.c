@@ -19,7 +19,7 @@ void loop(int sockfd)
         read(sockfd, buffer, sizeof(buffer));
 
         // Verificar se é o comando de saída
-        if ((strncmp(buffer, "exit", 4)) == 0)
+        if ((strncmp(buffer, "EXIT", 4)) == 0)
             break;
 
         // Executar o comando recebido
@@ -54,16 +54,18 @@ int main(int argc, char **argv)
     int sockfd = Socket(AF_INET, SOCK_STREAM, 0);
     struct sockaddr_in servaddr = SocketAddress(AF_INET, argv[1], atoi(argv[2]));
 
-    // Exibir informações do servidor (argumentos) e seu socket local
-    PrintSocketInfo(sockfd, servaddr);
-    printf("[Peer Info] IP: %s | Port: %s\n", argv[1], argv[2]);
+    // Exibir informações do servidor (argumentos)
+    printf("[ Peer Info ] IP: %s | Port: %s\n", argv[1], argv[2]);
  
     // Conectar-se
     if (connect(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr)) != 0)
     {
         printf("Error connecting to the server\n");
-        exit(1);
+        exit(2);
     }
+
+    // Exibir informações do socket local
+    PrintSocketInfo(sockfd, servaddr);
  
     // Loop de mensagens
     loop(sockfd);
