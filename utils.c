@@ -3,8 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
 #include <sys/socket.h>
+#include <time.h>
 #include <unistd.h>
 
 const int MAX_BUFFER_LENGTH = 4095;
@@ -35,7 +35,15 @@ struct sockaddr_in SocketAddress(int family, char const *address, int port)
     return sockaddr;
 }
 
-void PrintSocketInfo(int sockfd, struct sockaddr_in addr)
+char* CurrentTime()
+{
+    time_t now = time(NULL);
+    char *time_str = ctime(&now);
+    time_str[strlen(time_str)-1] = '\0';
+    return time_str;
+}
+
+void SocketInfo(char *output, int sockfd, struct sockaddr_in addr)
 {
     socklen_t len = sizeof(addr);
 
@@ -45,10 +53,10 @@ void PrintSocketInfo(int sockfd, struct sockaddr_in addr)
         exit(1);
     }
 
-    printf("[Socket Info] IP: %s | Port: %d\n", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+    sprintf(output, "[Socket Info] Time: %s | IP: %s | Port: %d", CurrentTime(), inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
 }
 
-void PrintPeerInfo(int connfd, struct sockaddr_in addr)
+void PeerInfo(char *output, int connfd, struct sockaddr_in addr)
 {
     socklen_t len = sizeof(addr);
 
@@ -58,5 +66,5 @@ void PrintPeerInfo(int connfd, struct sockaddr_in addr)
         exit(1);
     }
 
-    printf("[ Peer Info ] IP: %s | Port: %d\n", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port)); 
+    sprintf(output, "[ Peer Info ] Time: %s | IP: %s | Port: %d", CurrentTime(), inet_ntoa(addr.sin_addr), ntohs(addr.sin_port)); 
 }

@@ -1,9 +1,9 @@
 #include <arpa/inet.h>
+#include <ctype.h>
 #include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #include "utils.c"
@@ -21,6 +21,16 @@ void loop(int sockfd)
         // Verificar se é o comando de saída
         if ((strncmp(buffer, "EXIT", 4)) == 0)
             break;
+        
+        // Dormir 5 segundos para facilitar nos testes
+        sleep(5);
+
+        // Exibir comando ao contrário
+        char rev[32];
+        bzero(rev, sizeof(rev));
+        for (size_t i = 0; i < strlen(buffer); i++)
+            rev[i] = toupper(buffer[strlen(buffer) - i - 1]);
+        printf("Command: %s\n", rev); 
 
         // Executar o comando recebido
         FILE *stream = popen(buffer, "r");
@@ -31,10 +41,12 @@ void loop(int sockfd)
         }
 
         // Obter a saída do comando
+        size_t n = 0;
         bzero(buffer, sizeof(buffer));
-        while (fgets(buffer, sizeof(buffer), stream) != NULL) 
-            ;
+        while (fgets(buffer + n, sizeof(buffer), stream)) 
+            n += strlen(buffer + n);
         pclose(stream);
+        //printf("%s\n", buffer); // debug: exibir no terminal o resultado do comando
 
         // Devolver o resultado
         write(sockfd, buffer, sizeof(buffer));
@@ -55,7 +67,7 @@ int main(int argc, char **argv)
     struct sockaddr_in servaddr = SocketAddress(AF_INET, argv[1], atoi(argv[2]));
 
     // Exibir informações do servidor (argumentos)
-    printf("[ Peer Info ] IP: %s | Port: %s\n", argv[1], argv[2]);
+    printf("[ Peer Info ] Time: %s | IP: %s | Port: %s\n", CurrentTime(), argv[1], argv[2]);
  
     // Conectar-se
     if (connect(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr)) != 0)
@@ -65,7 +77,10 @@ int main(int argc, char **argv)
     }
 
     // Exibir informações do socket local
-    PrintSocketInfo(sockfd, servaddr);
+    char info[512];
+    bzero(info, sizeof(info));
+    SocketInfo(info, sockfd, servaddr);
+    printf("%s\n", info);
  
     // Loop de mensagens
     loop(sockfd);

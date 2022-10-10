@@ -14,6 +14,12 @@ void loop(int connfd, struct sockaddr_in connaddr)
 
     for (int i = 0; i < 4; i++)
     {
+        // Exibir comando enviado ao cliente
+        char info[512];
+        bzero(info, sizeof(info));
+        PeerInfo(info, connfd, connaddr);
+        printf("%s | Command: %s\n", info, commands[i]); // Exibir na saída padrão
+
         // Enviar comando
         write(connfd, commands[i], sizeof(commands[i]));
 
@@ -37,10 +43,13 @@ void loop(int connfd, struct sockaddr_in connaddr)
         if (!stream)
         {
             perror("Error opening file");
-            exit(6);
+            exit(7);
         }
 
         // Escrever no arquivo
+        bzero(info, sizeof(info));
+        PeerInfo(info, connfd, connaddr);
+        fprintf(stream, "%s\n\n", info);
         fprintf(stream, "%s", buffer);
   
         // Fechar o arquivo
@@ -88,15 +97,26 @@ int main(int argc, char **argv)
             exit(4);
         }
 
-        // Exibe informações do cliente
-        PrintPeerInfo(connfd, connaddr);
+        // Exibe informações de conexão
+        char info[512];
+        bzero(info, sizeof(info));
+        PeerInfo(info, connfd, connaddr);
+        //printf("Connected - %s\n", info); // Exibir na saída padrão
+        FILE *stream = fopen("Connections.txt", "a");
+        if (!stream)
+        {
+            perror("Error opening file");
+            exit(5);
+        }
+        fprintf(stream, "Connected    - %s\n", info);
+        fclose(stream);
 
         // Cria um processo filho
         int childpid = fork();
         if (childpid < 0)
         {
             printf("Error creating child process\n");
-            exit(5);
+            exit(6);
         }
         else if (childpid == 0)
         {
@@ -105,6 +125,19 @@ int main(int argc, char **argv)
         
             // Loop de mensagens
             loop(connfd, connaddr);
+
+            // Exibe informações de desconexão
+            bzero(info, sizeof(info));
+            PeerInfo(info, connfd, connaddr);
+            //printf("Disconnected - %s\n", info); // Exibir na saída padrão
+            stream = fopen("Connections.txt", "a");
+            if (!stream)
+            {
+                perror("Error opening file");
+                exit(5);
+            }
+            fprintf(stream, "Disconnected - %s\n", info);
+            fclose(stream);
 
             // Fechar a conexão com o cliente
             close(connfd);
