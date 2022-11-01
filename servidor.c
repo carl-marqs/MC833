@@ -5,7 +5,17 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/wait.h>
+#include <signal.h>
+#include <errno.h>
 #include "utils.c"
+
+
+typedef void Sigfunc(int);
+
+void sig_chld(int);
+Sigfunc* Signal(int signo, Sigfunc *func);
+
 
 void loop(int connfd, struct sockaddr_in connaddr)
 {
@@ -13,7 +23,7 @@ void loop(int connfd, struct sockaddr_in connaddr)
     const char *commands[4] = { "ifconfig", "pwd", "ls -l", "EXIT" };
 
     for (int i = 0; i < 4; i++)
-    {
+    {        
         // Exibir comando enviado ao cliente
         char info[512];
         bzero(info, sizeof(info));
@@ -32,37 +42,37 @@ void loop(int connfd, struct sockaddr_in connaddr)
         read(connfd, buffer, sizeof(buffer));
 
         // Obter nome do arquivo
-        char filename[32];
-        sprintf(filename, "%d", ntohs(connaddr.sin_port));
-        strcat(filename, " - ");
-        strcat(filename, commands[i]);
-        strcat(filename, ".txt");
+        //char filename[32];
+        //sprintf(filename, "%d", ntohs(connaddr.sin_port));
+        //strcat(filename, " - ");
+        //strcat(filename, commands[i]);
+        //strcat(filename, ".txt");
 
         // Abrir o arquivo
-        FILE *stream = fopen(filename, "w");
-        if (!stream)
-        {
-            perror("Error opening file");
-            exit(7);
-        }
+        //FILE *stream = fopen(filename, "w");
+        //if (!stream)
+        //{
+        //    perror("Error opening file");
+        //    exit(7);
+        //}
 
         // Escrever no arquivo
-        bzero(info, sizeof(info));
-        PeerInfo(info, connfd, connaddr);
-        fprintf(stream, "%s\n\n", info);
-        fprintf(stream, "%s", buffer);
+        //bzero(info, sizeof(info));
+        //PeerInfo(info, connfd, connaddr);
+        //fprintf(stream, "%s\n\n", info);
+        //fprintf(stream, "%s", buffer);
   
         // Fechar o arquivo
-        fclose(stream);
+        //fclose(stream);
     }
 }
 
 int main(int argc, char **argv)
 {
     // Verificar argumentos
-    if (argc < 2)
+    if (argc < 3)
     {
-        printf("Usage: servidor <Port>\n");
+        printf("Usage: servidor <Port> <Backlog>\n");
         exit(1);
     }
 
@@ -79,23 +89,39 @@ int main(int argc, char **argv)
     }
    
     // Entrar em modo de escuta
-    if ((listen(sockfd, 10)) != 0)
+    if ((listen(sockfd, atoi(argv[2]))) != 0)
     {
         printf("Error listening to clients\n");
         exit(3);
     }
+
+    // Chamar waitpid()
+    Signal(SIGCHLD, sig_chld);
    
     // Fluxo concorrente
     socklen_t len = sizeof(connaddr); 
     for (;;)
     {
-        // Aceita a conexão de um cliente
-        int connfd = accept(sockfd, (struct sockaddr*)&connaddr, &len);
-        if (connfd < 0)
-        {
-            //printf("Error accepting client\n");
-            exit(4);
+        //sleep(5);
+
+        int connfd;
+        if ( (connfd = accept(sockfd, (struct sockaddr*)&connaddr, &len)) < 0) {
+            if (errno == EINTR)
+                continue;
+            else
+            {
+                perror("accept error");
+                exit(4);
+            }
         }
+
+        // Aceita a conexão de um cliente
+        //int connfd = accept(sockfd, (struct sockaddr*)&connaddr, &len);
+        //if (connfd < 0)
+        //{
+        //    //printf("Error accepting client\n");
+        //    exit(4);
+        //}
 
         // Exibe informações de conexão
         char info[512];
@@ -146,4 +172,32 @@ int main(int argc, char **argv)
         // Fecha a conexão
         close(connfd);  
     }
+}
+
+Sigfunc* Signal(int signo, Sigfunc *func)
+{
+    struct sigaction act, oact;
+    act.sa_handler = func;
+    sigemptyset (&act.sa_mask); /* Outros sinais não são bloqueados*/
+    act.sa_flags = 0;
+    if (signo == SIGALRM) { /* Para reiniciar chamadas interrompidas */
+        #ifdef SA_INTERRUPT
+            act.sa_flags |= SA_INTERRUPT; /* SunOS 4.x */
+        #endif
+    } else {
+        #ifdef SA_RESTART
+            act.sa_flags |= SA_RESTART; /* SVR4, 4.4BSD */
+        #endif
+    }
+    if (sigaction (signo, &act, &oact) < 0)
+        return (SIG_ERR);
+    return (oact.sa_handler);
+ }
+
+void sig_chld(int signo) {
+    pid_t pid;
+    int stat;
+    while ( (pid = waitpid(-1, &stat, WNOHANG)) > 0)
+        printf("child %d terminated\n", pid);
+    return;
 }

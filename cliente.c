@@ -23,29 +23,29 @@ void loop(int sockfd)
             break;
         
         // Dormir 5 segundos para facilitar nos testes
-        sleep(5);
+        //sleep(5);
 
         // Exibir comando ao contrário
-        char rev[32];
-        bzero(rev, sizeof(rev));
-        for (size_t i = 0; i < strlen(buffer); i++)
-            rev[i] = toupper(buffer[strlen(buffer) - i - 1]);
-        printf("Command: %s\n", rev); 
+        //char rev[32];
+        //bzero(rev, sizeof(rev));
+        //for (size_t i = 0; i < strlen(buffer); i++)
+        //    rev[i] = toupper(buffer[strlen(buffer) - i - 1]);
+        //printf("Command: %s\n", rev); 
 
         // Executar o comando recebido
-        FILE *stream = popen(buffer, "r");
-        if (!stream)
-        {
-            perror("Error executing command");
-            exit(1);
-        }
+        //FILE *stream = popen(buffer, "r");
+        //if (!stream)
+        //{
+        //    perror("Error executing command");
+        //    exit(1);
+        //}
 
         // Obter a saída do comando
-        size_t n = 0;
-        bzero(buffer, sizeof(buffer));
-        while (fgets(buffer + n, sizeof(buffer), stream)) 
-            n += strlen(buffer + n);
-        pclose(stream);
+        //size_t n = 0;
+        //bzero(buffer, sizeof(buffer));
+        //while (fgets(buffer + n, sizeof(buffer), stream)) 
+        //    n += strlen(buffer + n);
+        //pclose(stream);
         //printf("%s\n", buffer); // debug: exibir no terminal o resultado do comando
 
         // Devolver o resultado

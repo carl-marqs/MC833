@@ -3,10 +3,11 @@
 # Inicializar variáveis
 port='1327'
 address='127.0.0.1'
+backlog='5'
 
 # Iniciar o servidor
-echo "Starting server on port $port"
-./servidor $port &
+echo "Starting server on port $port with backlog = $backlog"
+./servidor $port $backlog &
 sleep 1 # dormir 2s
 
 i=1
