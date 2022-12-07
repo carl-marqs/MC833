@@ -5,55 +5,100 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/wait.h>
+#include <signal.h>
+#include <errno.h>
 #include "utils.c"
+
+
+typedef void Sigfunc(int);
+
+void sig_chld(int);
+Sigfunc* Signal(int signo, Sigfunc *func);
+
 
 void loop(int connfd, struct sockaddr_in connaddr)
 {
     char buffer[MAX_BUFFER_LENGTH];
-    const char *commands[4] = { "ifconfig", "pwd", "ls -l", "EXIT" };
+       
+    // Obter informações do cliente
+    char info[512];
+    bzero(info, sizeof(info));
+    PeerInfo(info, connfd, connaddr);
 
-    for (int i = 0; i < 4; i++)
+    // Obter nome do arquivo
+    char filename[32];
+    sprintf(filename, "%d.txt", ntohs(connaddr.sin_port));
+
+    // Abrir o arquivo
+    FILE *stream = fopen(filename, "w");
+    if (!stream)
     {
-        // Exibir comando enviado ao cliente
-        char info[512];
-        bzero(info, sizeof(info));
-        PeerInfo(info, connfd, connaddr);
-        printf("%s | Command: %s\n", info, commands[i]); // Exibir na saída padrão
+        perror("Error creating file");
+        exit(7);
+    }
 
-        // Enviar comando
-        write(connfd, commands[i], sizeof(commands[i]));
+    // Escrever informações no arquivo
+    bzero(info, sizeof(info));
+    PeerInfo(info, connfd, connaddr);
+    fprintf(stream, "%s\n\n", info);
 
-        // Critério de saída
-        if (i >= 3)
-            break;
+    // Fechar o arquivo
+    fclose(stream);
 
-        // Ler o resultado dos comandos
+    for (;;) // loop infinito
+    {
+        // Solicitar mensagem
+        printf("S: ");
         bzero(buffer, sizeof(buffer));
-        read(connfd, buffer, sizeof(buffer));
+        //scanf("%4094[^\n]", buffer);
+        fgets(buffer, MAX_BUFFER_LENGTH, stdin);
 
-        // Obter nome do arquivo
-        char filename[32];
-        sprintf(filename, "%d", ntohs(connaddr.sin_port));
-        strcat(filename, " - ");
-        strcat(filename, commands[i]);
-        strcat(filename, ".txt");
-
+        // Enviar mensagem
+        write(connfd, buffer, sizeof(buffer));
+        
         // Abrir o arquivo
-        FILE *stream = fopen(filename, "w");
+        stream = fopen(filename, "a");
         if (!stream)
         {
-            perror("Error opening file");
-            exit(7);
+            perror("Error appending file");
+            exit(8);
         }
 
         // Escrever no arquivo
-        bzero(info, sizeof(info));
-        PeerInfo(info, connfd, connaddr);
-        fprintf(stream, "%s\n\n", info);
-        fprintf(stream, "%s", buffer);
+        fprintf(stream, "S: %s", buffer);
   
         // Fechar o arquivo
         fclose(stream);
+
+        // Critério de saída
+        if (strcmp(buffer, "finalizar_chat\n") == 0)
+            break;
+
+        // Ler mensagem recebida
+        bzero(buffer, sizeof(buffer));
+        read(connfd, buffer, sizeof(buffer));
+
+        // Exibir mensagem do cliente
+        printf("C: %s", buffer);
+
+        // Abrir o arquivo
+        stream = fopen(filename, "a");
+        if (!stream)
+        {
+            perror("Error appending file");
+            exit(8);
+        }
+
+        // Escrever no arquivo
+        fprintf(stream, "C: %s", buffer);
+  
+        // Fechar o arquivo
+        fclose(stream);
+
+        // Critério de saída
+        if (strcmp(buffer, "finalizar_chat\n") == 0)
+            break;
     }
 }
 
@@ -62,7 +107,7 @@ int main(int argc, char **argv)
     // Verificar argumentos
     if (argc < 2)
     {
-        printf("Usage: servidor <Port>\n");
+        printf("Usage: servidor <Port>\n");    
         exit(1);
     }
 
@@ -84,24 +129,31 @@ int main(int argc, char **argv)
         printf("Error listening to clients\n");
         exit(3);
     }
+
+    // Chamar waitpid()
+    Signal(SIGCHLD, sig_chld);
    
     // Fluxo concorrente
     socklen_t len = sizeof(connaddr); 
     for (;;)
     {
         // Aceita a conexão de um cliente
-        int connfd = accept(sockfd, (struct sockaddr*)&connaddr, &len);
-        if (connfd < 0)
-        {
-            //printf("Error accepting client\n");
-            exit(4);
+        int connfd;
+        if ( (connfd = accept(sockfd, (struct sockaddr*)&connaddr, &len)) < 0) {
+            if (errno == EINTR)
+                continue;
+            else
+            {
+                //perror("accept error");
+                exit(4);
+            }
         }
 
         // Exibe informações de conexão
         char info[512];
         bzero(info, sizeof(info));
         PeerInfo(info, connfd, connaddr);
-        //printf("Connected - %s\n", info); // Exibir na saída padrão
+        printf("%s\n", info); // Exibir na saída padrão
         FILE *stream = fopen("Connections.txt", "a");
         if (!stream)
         {
@@ -146,4 +198,32 @@ int main(int argc, char **argv)
         // Fecha a conexão
         close(connfd);  
     }
+}
+
+Sigfunc* Signal(int signo, Sigfunc *func)
+{
+    struct sigaction act, oact;
+    act.sa_handler = func;
+    sigemptyset (&act.sa_mask); /* Outros sinais não são bloqueados*/
+    act.sa_flags = 0;
+    if (signo == SIGALRM) { /* Para reiniciar chamadas interrompidas */
+        #ifdef SA_INTERRUPT
+            act.sa_flags |= SA_INTERRUPT; /* SunOS 4.x */
+        #endif
+    } else {
+        #ifdef SA_RESTART
+            act.sa_flags |= SA_RESTART; /* SVR4, 4.4BSD */
+        #endif
+    }
+    if (sigaction (signo, &act, &oact) < 0)
+        return (SIG_ERR);
+    return (oact.sa_handler);
+ }
+
+void sig_chld(int signo) {
+    pid_t pid;
+    int stat;
+    while ( (pid = waitpid(-1, &stat, WNOHANG)) > 0)
+        printf("child %d terminated\n", pid);
+    return;
 }

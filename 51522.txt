@@ -1,0 +1,11 @@
+[ Peer Info ] Time: Tue Dec  6 20:43:08 2022 | IP: 127.0.0.1 | Port: 51522
+
+S: Olá, cliente! Tudo bem?
+C: Oi, servidor! Estou bem sim, e você?
+S: Bem também! Como posso te ajudar hoje?
+C: Gostaria de encerrar essa conversa...
+S: Sem problemas, um instante.
+C: Obrigado :)
+S: encerrar_chat
+C: Não funcionou!
+S: finalizar_chat

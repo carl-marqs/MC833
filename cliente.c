@@ -14,42 +14,29 @@ void loop(int sockfd)
 
     for (;;) // loop infinito
     {
-        // Ler os comandos enviados pelo servidor
+        // Ler mensagem enviada pelo servidor
         bzero(buffer, sizeof(buffer));
         read(sockfd, buffer, sizeof(buffer));
 
-        // Verificar se é o comando de saída
-        if ((strncmp(buffer, "EXIT", 4)) == 0)
+        // Exibir mensagem do servidor
+        printf("S: %s", buffer);
+
+        // Critério de saída
+        if (strcmp(buffer, "finalizar_chat\n") == 0)
             break;
-        
-        // Dormir 5 segundos para facilitar nos testes
-        sleep(5);
 
-        // Exibir comando ao contrário
-        char rev[32];
-        bzero(rev, sizeof(rev));
-        for (size_t i = 0; i < strlen(buffer); i++)
-            rev[i] = toupper(buffer[strlen(buffer) - i - 1]);
-        printf("Command: %s\n", rev); 
-
-        // Executar o comando recebido
-        FILE *stream = popen(buffer, "r");
-        if (!stream)
-        {
-            perror("Error executing command");
-            exit(1);
-        }
-
-        // Obter a saída do comando
-        size_t n = 0;
+        // Solicitar mensagem
+        printf("C: ");
         bzero(buffer, sizeof(buffer));
-        while (fgets(buffer + n, sizeof(buffer), stream)) 
-            n += strlen(buffer + n);
-        pclose(stream);
-        //printf("%s\n", buffer); // debug: exibir no terminal o resultado do comando
+        //scanf("%4094[^\n]", buffer);
+        fgets(buffer, MAX_BUFFER_LENGTH, stdin);
 
-        // Devolver o resultado
+        // Enviar mensagem
         write(sockfd, buffer, sizeof(buffer));
+
+        // Critério de saída
+        if (strcmp(buffer, "finalizar_chat\n") == 0)
+            break;
     }
 }
  
